@@ -14,6 +14,28 @@ Automatically generates and installs professional man pages from README.md files
 
 ## Installation
 
+### Quick Install (Recommended)
+
+Install with a single command:
+
+```bash
+# System-wide installation (recommended)
+curl -sSL https://raw.githubusercontent.com/Open-Technology-Foundation/manpage/main/install.sh | sudo bash
+
+# Or with wget
+wget -qO- https://raw.githubusercontent.com/Open-Technology-Foundation/manpage/main/install.sh | sudo bash
+
+# User-local installation (no sudo required)
+curl -sSL https://raw.githubusercontent.com/Open-Technology-Foundation/manpage/main/install.sh | bash -s -- --user
+```
+
+This will install:
+- The `manpage` command to `/usr/local/bin/` (or `~/.local/bin/` for user install)
+- Bash completion support to `/etc/bash_completion.d/`
+- The man page to `/usr/local/share/man/man1/`
+
+### Manual Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/Open-Technology-Foundation/manpage.git
@@ -29,15 +51,14 @@ chmod +x manpage
 sudo ./manpage generate -i manpage
 ```
 
-### Alternative Installation
+### Uninstall
 
 ```bash
-# Direct download
-wget https://raw.githubusercontent.com/Open-Technology-Foundation/manpage/main/manpage
-chmod +x manpage
+# System-wide uninstall
+curl -sSL https://raw.githubusercontent.com/Open-Technology-Foundation/manpage/main/install.sh | sudo bash -s -- --uninstall
 
-# Install to PATH
-sudo mv manpage /usr/local/bin/
+# User-local uninstall
+curl -sSL https://raw.githubusercontent.com/Open-Technology-Foundation/manpage/main/install.sh | bash -s -- --uninstall --user
 ```
 
 ## Quick Start
