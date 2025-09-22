@@ -1,0 +1,45 @@
+```troff
+.TH TESTCMD 1 "September 2025" "" "User Commands"
+.SH NAME
+testcmd \- A simple test command for the manpage test suite
+.SH SYNOPSIS
+.B testcmd
+[\fIoptions\fP]
+.I file
+.SH DESCRIPTION
+This is a test command used to verify the manpage generation functionality.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show help message
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output
+.TP
+.BR \-f ", " \-\-force
+Force operation
+.SH EXAMPLES
+.nf
+testcmd myfile.txt
+testcmd -v data.json
+testcmd --force --verbose report.pdf
+.fi
+.SH ENVIRONMENT
+.TP
+.B TESTCMD_HOME
+Home directory for testcmd
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Invalid arguments
+.SH AUTHOR
+Test Suite
+.SH COPYRIGHT
+MIT License
+```

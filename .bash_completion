@@ -1,0 +1,68 @@
+# Bash completion for manpage script
+_manpage() {
+  local cur prev words cword
+  _init_completion || return
+
+  local commands="generate install"
+  local options="-h --help -v --verbose -q --quiet -V --version"
+  local generate_options="-i --install"
+
+  case $cword in
+    1)
+      # First argument - show commands and global options
+      COMPREPLY=($(compgen -W "$commands $options" -- "$cur"))
+      ;;
+    *)
+      case "${words[1]}" in
+        generate)
+          case $prev in
+            -i|--install|generate)
+              # After generate or install flags, complete with executable files
+              _filedir
+              ;;
+            *)
+              case $cword in
+                2)
+                  # Second argument can be options or command path
+                  COMPREPLY=($(compgen -W "$generate_options" -- "$cur"))
+                  if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
+                    _filedir
+                  fi
+                  ;;
+                3)
+                  # Third argument - if previous was -i/--install, complete with files
+                  # Otherwise complete with README.md files
+                  if [[ "${words[2]}" == "-i" || "${words[2]}" == "--install" ]]; then
+                    _filedir
+                  else
+                    _filedir "md"
+                  fi
+                  ;;
+                4)
+                  # Fourth argument - README.md file path
+                  _filedir "md"
+                  ;;
+              esac
+              ;;
+          esac
+          ;;
+        install)
+          case $cword in
+            2)
+              # Complete with executable files
+              _filedir
+              ;;
+          esac
+          ;;
+        *)
+          # For unknown commands, complete with global options
+          COMPREPLY=($(compgen -W "$options" -- "$cur"))
+          ;;
+      esac
+      ;;
+  esac
+
+  return 0
+}
+
+complete -F _manpage manpage

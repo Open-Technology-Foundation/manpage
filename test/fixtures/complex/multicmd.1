@@ -1,0 +1,225 @@
+```troff
+.TH MULTICMD 1 "December 2024" "2.0.0" "User Commands"
+.SH NAME
+multicmd \- Advanced multi-feature command with extensive documentation for comprehensive testing
+.SH SYNOPSIS
+.B multicmd
+.RI [ global-options ]
+.I command
+.RI [ command-options ]
+.SH DESCRIPTION
+Multicmd is a sophisticated command-line tool that demonstrates complex man page generation.
+It supports multiple subcommands, global and local options, and extensive configuration.
+.PP
+This tool is designed to test the full capabilities of the manpage generator, including
+proper formatting of complex structures, nested options, and multiple sections.
+.SH COMMANDS
+.SS init
+Initialize a new project with default configuration.
+.PP
+Usage:
+.B multicmd init
+.RI [ options ]
+.I PROJECT_NAME
+.PP
+Options:
+.TP
+.BI \-\-template " TEMPLATE"
+Use a specific project template
+.TP
+.B \-\-no\-git
+Skip git repository initialization
+.SS build
+Build the project using the configuration file.
+.PP
+Usage:
+.B multicmd build
+.RI [ options ]
+.PP
+Options:
+.TP
+.B \-\-clean
+Clean before building
+.TP
+.BI \-\-parallel " N"
+Use N parallel jobs
+.TP
+.BI \-\-profile " PROFILE"
+Build profile (debug|release)
+.SS deploy
+Deploy the built project to the specified environment.
+.PP
+Usage:
+.B multicmd deploy
+.RI [ options ]
+.I ENVIRONMENT
+.PP
+Options:
+.TP
+.B \-\-dry\-run
+Simulate deployment without changes
+.TP
+.B \-\-force
+Force deployment even with warnings
+.SH GLOBAL OPTIONS
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output
+.TP
+.BR \-q ", " \-\-quiet
+Suppress non-error output
+.TP
+.BI \-\-config " FILE"
+Use specified configuration file
+.TP
+.B \-\-no\-color
+Disable colored output
+.TP
+.B \-\-debug
+Enable debug mode with trace output
+.SH CONFIGURATION
+Multicmd uses a hierarchical configuration system:
+.PP
+.IP 1. 4
+Command-line arguments (highest priority)
+.IP 2. 4
+Environment variables
+.IP 3. 4
+User configuration file (~/.multicmdrc)
+.IP 4. 4
+System configuration file (/etc/multicmd.conf)
+.IP 5. 4
+Built-in defaults (lowest priority)
+.SH ENVIRONMENT
+.TP
+.B MULTICMD_HOME
+Base directory for multicmd operations
+.TP
+.B MULTICMD_CONFIG
+Path to configuration file
+.TP
+.B MULTICMD_CACHE
+Cache directory location
+.TP
+.B MULTICMD_LOG_LEVEL
+Logging verbosity (ERROR|WARN|INFO|DEBUG)
+.SH EXAMPLES
+Initialize a new project:
+.nf
+multicmd init myproject
+multicmd init --template nodejs webapp
+.fi
+.PP
+Build with custom options:
+.nf
+multicmd build
+multicmd --verbose build --parallel 4
+multicmd --config custom.conf build --profile release
+.fi
+.PP
+Deploy to staging:
+.nf
+multicmd deploy staging
+multicmd deploy --dry-run production
+.fi
+.PP
+Complex workflow:
+.nf
+multicmd --debug init myapp && \\
+  cd myapp && \\
+  multicmd build --clean && \\
+  multicmd deploy --force staging
+.fi
+.SH FILES
+.TP
+.I ~/.multicmdrc
+User configuration file (YAML format)
+.TP
+.I /etc/multicmd.conf
+System-wide configuration
+.TP
+.I ./.multicmd.yml
+Project-specific configuration
+.TP
+.I ~/.multicmd/cache/
+Cache directory
+.TP
+.I ~/.multicmd/logs/
+Log files directory
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Invalid command-line arguments
+.TP
+.B 3
+Configuration error
+.TP
+.B 4
+Build failure
+.TP
+.B 5
+Deployment failure
+.TP
+.B 126
+Command cannot execute
+.TP
+.B 127
+Command not found
+.SH DIAGNOSTICS
+Multicmd provides detailed error messages and diagnostic information.
+Use
+.B \-\-debug
+flag for trace-level output.
+.PP
+Common error messages:
+.TP
+"Configuration file not found"
+Check MULTICMD_CONFIG path
+.TP
+"Invalid project structure"
+Ensure proper project initialization
+.TP
+"Build failed"
+Check build logs in ~/.multicmd/logs/
+.SH NOTES
+This command requires an active internet connection for certain operations.
+Proxy settings are respected from standard environment variables (HTTP_PROXY, HTTPS_PROXY).
+.SH BUGS
+Known issues:
+.IP \(bu 2
+Parallel builds may fail on systems with limited memory
+.IP \(bu 2
+Unicode filenames may not display correctly on some terminals
+.PP
+Report bugs to: https://github.com/example/multicmd/issues
+.SH SEE ALSO
+.BR buildtool (1),
+.BR deploy (1),
+.BR config (5),
+.BR multicmd-init (1),
+.BR multicmd-build (1)
+.SH HISTORY
+Version 2.0.0 (2024) - Complete rewrite with subcommand support
+.br
+Version 1.5.0 (2023) - Added deployment capabilities
+.br
+Version 1.0.0 (2022) - Initial release
+.SH AUTHOR
+Test Author <test@example.com>
+.br
+Contributors: Alice Developer, Bob Maintainer
+.SH COPYRIGHT
+Copyright (C) 2024 Test Organization
+.PP
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction.
+.PP
+MIT License - See LICENSE file for full text.
+```

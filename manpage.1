@@ -1,0 +1,148 @@
+.TH MANPAGE 1 "January 2025" "1.0.0" "User Commands"
+.SH NAME
+manpage \- automatically generate and install UNIX man pages from README.md files using AI assistance
+.SH SYNOPSIS
+.B manpage generate
+[\fB\-i\fR|\fB\-\-install\fR]
+.I command
+[\fIreadme\fR]
+.br
+.B manpage install
+.I command
+.SH DESCRIPTION
+.B manpage
+is a utility that automatically generates properly formatted UNIX man pages from README.md files using AI assistance. It converts Markdown documentation into troff/man format and handles installation to appropriate system or user directories.
+.PP
+The tool uses the Claude CLI to intelligently parse README content and generate man pages with standard sections in conventional order. It supports both user-local and system-wide installation with automatic detection based on privileges.
+.SH OPTIONS
+.SS generate command
+.TP
+.B \-i, \-\-install
+Install the man page immediately after generation
+.TP
+.I command
+Path to the command/script to document
+.TP
+.I readme
+Optional path to README.md file (defaults to command's directory)
+.SS install command
+.TP
+.I command
+Path to the command whose man page to install
+.SH EXAMPLES
+Generate man page for a script in current directory:
+.PP
+.nf
+manpage generate ./myscript
+.fi
+.PP
+Generate for a system command:
+.PP
+.nf
+manpage generate /usr/local/bin/mytool
+.fi
+.PP
+Generate with explicit README location:
+.PP
+.nf
+manpage generate mytool ~/projects/mytool/docs/README.md
+.fi
+.PP
+Generate and install immediately:
+.PP
+.nf
+manpage generate \-i ./myscript
+.fi
+.PP
+Install for current user:
+.PP
+.nf
+manpage install ./myscript
+.fi
+.PP
+Install system-wide:
+.PP
+.nf
+sudo manpage install ./myscript
+.fi
+.SH EXIT STATUS
+.TP
+.B 0
+Successful execution
+.TP
+.B 1
+Error occurred (missing files, invalid command, etc.)
+.SH ENVIRONMENT
+The script respects standard UNIX conventions. Man pages are installed to section 1 (user commands).
+.PP
+User installations may require adding to MANPATH:
+.PP
+.nf
+export MANPATH="$HOME/.local/share/man:$MANPATH"
+.fi
+.SH FILES
+.TP
+.I ~/.local/share/man/man1/
+User-local man page installation directory
+.TP
+.I /usr/local/share/man/man1/
+System-wide man page installation directory
+.TP
+.I README.md
+Source documentation file (searched in command's directory by default)
+.TP
+.I command.1
+Generated man page file (stored in README's directory)
+.SH NOTES
+.SS How It Works
+.IP 1.
+.B Path Resolution:
+Uses readlink \-en to resolve full paths for commands and README files
+.IP 2.
+.B README Discovery:
+Looks for README.md in the command's directory by default, or uses explicitly specified path
+.IP 3.
+.B AI Conversion:
+Uses Claude CLI with optimized prompts to convert README content to proper troff/man format
+.IP 4.
+.B Man Page Generation:
+Creates a .1 file in the README's directory with standard man page sections
+.IP 5.
+.B Smart Installation:
+Automatically detects whether running as root/sudo to choose between system-wide or user-local installation
+.IP 6.
+.B Database Update:
+Updates the man database after installation for immediate availability
+.SS Requirements
+.IP \(bu
+.B claude:
+Claude CLI tool must be installed and configured
+.IP \(bu
+.B bash:
+Version 4.0 or later
+.IP \(bu
+Standard UNIX utilities: readlink, grep, install, mandb/makewhatis
+.IP \(bu
+.B groff:
+For rendering and validating man pages
+.SS Troubleshooting
+.TP
+.B "claude command not found"
+Install the Claude CLI tool first.
+.TP
+.B "Cannot find README.md"
+Ensure README.md exists in the same directory as your command, or specify the path explicitly.
+.TP
+.B Man page not found after installation
+For user installations, ensure ~/.local/share/man is in your MANPATH.
+.SH BUGS
+Report bugs at https://github.com/yourusername/manpage/issues
+.SH SEE ALSO
+.BR man (1),
+.BR groff (1),
+.BR mandb (8),
+.BR makewhatis (8)
+.SH AUTHOR
+Created for automating man page generation from existing documentation.
+.SH COPYRIGHT
+MIT License \- See LICENSE file for details

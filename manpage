@@ -1,0 +1,367 @@
+#!/usr/bin/env bash
+# Generate and install man pages from README.md files
+set -euo pipefail
+
+# Script metadata
+VERSION='1.0.0'
+SCRIPT_PATH=$(readlink -en -- "$0") # Full path to script
+SCRIPT_DIR=${SCRIPT_PATH%/*}        # Script directory
+SCRIPT_NAME=${SCRIPT_PATH##*/}      # Script basename
+readonly -- VERSION SCRIPT_PATH SCRIPT_DIR SCRIPT_NAME
+
+# Recommended shopt settings
+shopt -s inherit_errexit shift_verbose extglob nullglob
+
+# Global variables
+declare -i VERBOSE=1
+declare -- CLAUDE_CMD='claude'
+declare -a CLAUDE_OPTS=(-p --dangerously-skip-permissions --model opus)
+readonly -- CLAUDE_CMD CLAUDE_OPTS
+
+# Standard colors
+if [[ -t 1 && -t 2 ]]; then
+  declare -- RED=$'\033[0;31m' GREEN=$'\033[0;32m' YELLOW=$'\033[0;33m' CYAN=$'\033[0;36m' NC=$'\033[0m'
+else
+  declare -- RED='' GREEN='' YELLOW='' CYAN='' NC=''
+fi
+readonly -- RED GREEN YELLOW CYAN NC
+
+# --------------------------------------------------------------------------------
+# Utility functions
+# --------------------------------------------------------------------------------
+
+# Core message function using FUNCNAME for context
+_msg() {
+  local -- prefix="$SCRIPT_NAME:" msg
+  case "${FUNCNAME[1]}" in
+    success) prefix+=" ${GREEN}✓${NC}" ;;
+    warn)    prefix+=" ${YELLOW}⚡${NC}" ;;
+    info)    prefix+=" ${CYAN}◉${NC}" ;;
+    error)   prefix+=" ${RED}✗${NC}" ;;
+    *)       ;;
+  esac
+  for msg in "$@"; do printf '%s %s\n' "$prefix" "$msg"; done
+}
+
+# Conditional output based on verbosity
+vecho() { ((VERBOSE)) || return 0; _msg "$@"; }
+success() { ((VERBOSE)) || return 0; >&2 _msg "$@"; }
+warn() { ((VERBOSE)) || return 0; >&2 _msg "$@"; }
+info() { ((VERBOSE)) || return 0; >&2 _msg "$@"; }
+
+# Unconditional output
+error() { >&2 _msg "$@"; }
+die() { (($# > 1)) && error "${@:2}"; exit "${1:-0}"; }
+
+# Argument validation
+noarg() {
+  if (($# < 2)) || [[ ${2:0:1} == '-' ]]; then
+    die 2 "Missing argument for option '$1'"
+  fi
+  return 0
+}
+
+# --------------------------------------------------------------------------------
+# Business logic functions
+# --------------------------------------------------------------------------------
+
+# Check if running as root
+is_root() {
+  [[ $EUID -eq 0 ]] || [[ -n "${SUDO_USER:-}" ]]
+}
+
+# Generate man page from README.md
+generate_manpage() {
+  local -- command_path="$1"
+  local -- readme_path="${2:-}"
+  local -- command_fullpath command_basename command_dir
+  local -- readme_fullpath readme_dir
+  local -- manpage_file
+  local -i exitcode=0
+
+  # Get fully qualified path for the command
+  if ! command_fullpath=$(readlink -en -- "$command_path" 2>/dev/null); then
+    # If readlink fails, try to resolve it differently
+    if [[ -f "$command_path" ]]; then
+      command_fullpath=$(cd "$(dirname "$command_path")" && pwd)/$(basename "$command_path")
+    else
+      die 1 "Command not found: $command_path"
+    fi
+  fi
+
+  command_basename="${command_fullpath##*/}"
+  command_dir="${command_fullpath%/*}"
+
+  # Determine README.md location
+  if [[ -n "$readme_path" ]]; then
+    # README path was explicitly provided
+    if ! readme_fullpath=$(readlink -en -- "$readme_path" 2>/dev/null); then
+      die 1 "README file not found: $readme_path"
+    fi
+  else
+    # Look for README.md in the same directory as the command
+    readme_fullpath="${command_dir}/README.md"
+    if [[ ! -f "$readme_fullpath" ]]; then
+      die 1 "Cannot find README.md in command directory: $command_dir"
+    fi
+  fi
+
+  readme_dir="${readme_fullpath%/*}"
+  info "Found README at: $readme_fullpath"
+
+  # Output filename for the man page (in same directory as README)
+  manpage_file="${readme_dir}/${command_basename}.1"
+
+  # Check if claude command exists
+  if ! command -v "$CLAUDE_CMD" >/dev/null 2>&1; then
+    die 1 "claude command not found. Please install claude-cli."
+  fi
+
+  # Create prompt for Claude
+  local -- prompt
+  prompt="Convert the README below to a man page in troff format for: $command_basename
+
+REQUIREMENTS:
+- Output ONLY troff directives, no explanatory text
+- Start with .TH, end with last directive
+- Manual section: 1 (user commands)
+- Date format: Month Year (e.g., December 2024)
+
+FORMATTING:
+- .TH COMMAND 1 \"date\" \"version\" \"User Commands\"
+- .SH for section headers
+- .TP for option lists with hanging indent
+- .IP for bullet points
+- .PP for new paragraphs
+- .B for bold text
+- .I for italic text
+- .BR for bold-roman alternation
+- .nf/.fi for preformatted text blocks
+
+STANDARD SECTIONS (in order when applicable):
+NAME, SYNOPSIS, DESCRIPTION, OPTIONS, EXAMPLES, EXIT STATUS, ENVIRONMENT, FILES, NOTES, BUGS, SEE ALSO, AUTHOR, COPYRIGHT
+
+CONTENT:"
+
+  info "Generating man page for '$command_basename'..."
+
+  # Use Claude to convert README to man page format
+  if "$CLAUDE_CMD" "${CLAUDE_OPTS[@]}" "$prompt" < "$readme_fullpath" > "$manpage_file" 2>/dev/null; then
+    success "Generated man page: $manpage_file"
+
+    # Verify the output looks like a man page
+    if ! grep -q '^\.TH' "$manpage_file"; then
+      warn "Generated file may not be a valid man page (missing .TH directive)"
+    fi
+  else
+    exitcode=$?
+    error "Failed to generate man page using claude"
+    [[ -f "$manpage_file" ]] && rm -f "$manpage_file"
+    return $exitcode
+  fi
+
+  return 0
+}
+
+# Install man page to appropriate directory
+install_manpage() {
+  local -- command_path="$1"
+  local -- command_fullpath command_basename command_dir
+  local -- manpage_file destdir
+  local -i exitcode=0
+
+  # Get fully qualified path for the command
+  if ! command_fullpath=$(readlink -en -- "$command_path" 2>/dev/null); then
+    # If readlink fails, try to resolve it differently
+    if [[ -f "$command_path" ]]; then
+      command_fullpath=$(cd "$(dirname "$command_path")" && pwd)/$(basename "$command_path")
+    else
+      # Just use the basename if we can't resolve the path
+      command_fullpath="$command_path"
+    fi
+  fi
+
+  command_basename="${command_fullpath##*/}"
+  command_dir="${command_fullpath%/*}"
+
+  # Look for the man page file in possible locations
+  # First check in the command's directory
+  if [[ -f "${command_dir}/${command_basename}.1" ]]; then
+    manpage_file="${command_dir}/${command_basename}.1"
+  # Then check current directory
+  elif [[ -f "${command_basename}.1" ]]; then
+    manpage_file="${command_basename}.1"
+  else
+    die 1 "No man page file found for '$command_basename'. Run 'generate' first."
+  fi
+
+  info "Installing man page: $manpage_file"
+
+  # Determine destination directory based on root/sudo status
+  if is_root; then
+    # System-wide installation
+    destdir="/usr/local/share/man/man1"
+    info "Using system directory: $destdir (running as root)"
+  else
+    # User's local man directory
+    destdir="${HOME}/.local/share/man/man1"
+    info "Using user directory: $destdir"
+  fi
+
+  # Create destination directory if it doesn't exist
+  if [[ ! -d "$destdir" ]]; then
+    info "Creating directory: $destdir"
+    if is_root; then
+      mkdir -p "$destdir" || die 1 "Failed to create system directory"
+    else
+      mkdir -p "$destdir" || die 1 "Failed to create directory"
+    fi
+  fi
+
+  # Install the man page
+  if is_root; then
+    # System-wide install (already running as root)
+    if install -m 644 "$manpage_file" "$destdir/"; then
+      success "Installed to system directory: $destdir/$(basename "$manpage_file")"
+      info "Updating man database..."
+      mandb 2>/dev/null || makewhatis 2>/dev/null || true
+    else
+      die 1 "Failed to install man page to system directory"
+    fi
+  else
+    # User install
+    if install -m 644 "$manpage_file" "$destdir/"; then
+      success "Installed to user directory: $destdir/$(basename "$manpage_file")"
+
+      # Check if directory is in MANPATH
+      if ! manpath 2>/dev/null | grep -q "$destdir"; then
+        warn "Note: $destdir may not be in your MANPATH"
+        info "Add to ~/.bashrc: export MANPATH=\"\$HOME/.local/share/man:\$MANPATH\""
+      fi
+    else
+      die 1 "Failed to install man page"
+    fi
+  fi
+
+  info "You can now use: man $command_basename"
+
+  return 0
+}
+
+# Usage documentation
+usage() {
+  cat <<EOT
+$SCRIPT_NAME $VERSION - Generate and install man pages from README.md files
+
+Converts README.md files to proper man pages using AI assistance and installs
+them to appropriate directories.
+
+Usage: $SCRIPT_NAME [Options] <command> [arguments]
+
+Commands:
+  generate [-i|--install] <command> [<readme>]
+                         Generate man page for <command>
+                         If <readme> not specified, looks for README.md in
+                         the same directory as <command>
+                         Use -i or --install to install immediately after generation
+
+  install <command>      Install generated man page for <command>
+                         Auto-detects system vs user installation based on
+                         root/sudo status
+
+Options:
+  -h|--help         This help message
+  -v|--verbose      Enable verbose output (default)
+  -q|--quiet        Disable verbose output
+  -V|--version      Show version
+
+Examples:
+  # Generate man page for 'myscript' (looks for README.md in myscript's directory)
+  $SCRIPT_NAME generate myscript
+
+  # Generate using a specific README
+  $SCRIPT_NAME generate myscript /path/to/README.md
+
+  # Generate and install in one command
+  $SCRIPT_NAME generate -i myscript
+
+  # Install existing man page (auto-detects user vs system)
+  $SCRIPT_NAME install myscript
+
+  # Install as root for system-wide access
+  sudo $SCRIPT_NAME install myscript
+
+Notes:
+  - Requires 'claude' CLI tool to be installed
+  - Man pages are created as <command>.1 in the README's directory
+  - Installation goes to:
+    * /usr/local/share/man/man1/ when running as root/sudo
+    * ~/.local/share/man/man1/ for regular users
+EOT
+  exit "${1:-0}"
+}
+
+# --------------------------------------------------------------------------------
+# Main function
+# --------------------------------------------------------------------------------
+
+main() {
+  local -i exitcode=0
+  local -- command=''
+  local -a args=()
+  local -i do_install=0
+
+  # Parse arguments
+  while (($#)); do case "$1" in
+    -v|--verbose)   VERBOSE=1 ;;
+    -q|--quiet)     VERBOSE=0 ;;
+    -V|--version)   echo "$SCRIPT_NAME $VERSION"; exit 0 ;;
+    -h|--help)      usage 0 ;;
+    -i|--install)   do_install=1 ;;  # Flag for generate command
+    -*)             die 22 "Invalid option '$1'" ;;
+    *)
+      if [[ -z "$command" ]]; then
+        command="$1"
+      else
+        args+=("$1")
+      fi
+      ;;
+  esac; shift; done
+
+  # Validate command
+  [[ -n "$command" ]] || usage 1
+
+  # Execute command
+  case "$command" in
+    generate)
+      # generate requires 1 or 2 arguments: <command> [<readme>]
+      [[ ${#args[@]} -ge 1 && ${#args[@]} -le 2 ]] || die 2 "generate requires <command> and optional [<readme>]"
+
+      # Generate the man page
+      generate_manpage "${args[0]}" "${args[1]:-}"
+      exitcode=$?
+
+      # If --install flag was provided and generation succeeded, install the man page
+      if [[ $exitcode -eq 0 && $do_install -eq 1 ]]; then
+        info "Installing generated man page..."
+        install_manpage "${args[0]}"
+        exitcode=$?
+      fi
+      ;;
+    install)
+      # install requires exactly 1 argument: <command>
+      [[ ${#args[@]} -eq 1 ]] || die 2 "install requires exactly one argument: <command>"
+      install_manpage "${args[0]}"
+      exitcode=$?
+      ;;
+    *)
+      die 22 "Unknown command: '$command'"
+      ;;
+  esac
+
+  return "$exitcode"
+}
+
+# Call main with all arguments
+main "$@"
+#fin
