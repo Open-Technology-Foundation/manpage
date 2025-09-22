@@ -430,9 +430,8 @@ cd test && ./test_manpage.sh
 
 ```
 manpage/
-├── manpage                 # Main executable script
+├── manpage                # Main executable script
 ├── README.md              # Project documentation (this file)
-├── CLAUDE.md              # AI assistant configuration
 ├── LICENSE                # GPL-3 license file
 ├── test/                  # Test suite directory
 │   ├── test_manpage.sh    # Comprehensive test runner
